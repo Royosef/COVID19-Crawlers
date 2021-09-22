@@ -1,13 +1,26 @@
-# Define your item pipelines here
-#
-# Don't forget to add your pipeline to the ITEM_PIPELINES setting
-# See: https://docs.scrapy.org/en/latest/topics/item-pipeline.html
-
-
-# useful for handling different item types with a single interface
+import codecs
 from itemadapter import ItemAdapter
+from pathlib import Path
+from itemadapter import ItemAdapter
+from crawlers.exporters import ArticleItemExporter
 
+class MultiCSVItemPipeline:
+    '''Export each article to different csv'''
 
-class CrawlersPipeline:
     def process_item(self, item, spider):
+        adapter = ItemAdapter(item)
+
+        folder = f'../../data/{adapter["source"]}'
+
+        Path(folder).mkdir(parents=True, exist_ok=True)
+
+        name = f'{folder}/{adapter["year"]} {adapter["month"]} {adapter["day"]} - {adapter["source"]} - {adapter["id"]}.csv'
+        file = open(name, 'w+b')
+
+        exporter = ArticleItemExporter(file, encoding='utf-8-sig')
+        exporter.start_exporting()
+        exporter.export_item(item)
+        exporter.finish_exporting()
+        file.close()
+
         return item

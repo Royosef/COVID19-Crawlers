@@ -7,6 +7,8 @@
 #     https://docs.scrapy.org/en/latest/topics/downloader-middleware.html
 #     https://docs.scrapy.org/en/latest/topics/spider-middleware.html
 
+from crawlers.pipelines import MultiCSVItemPipeline
+
 BOT_NAME = 'crawlers'
 
 SPIDER_MODULES = ['crawlers.spiders']
@@ -14,6 +16,8 @@ NEWSPIDER_MODULE = 'crawlers.spiders'
 
 HTTPERROR_ALLOWED_CODES  =[404]
 USER_AGENT = "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/34.0.1847.131 Safari/537.36"
+
+CLOSESPIDER_PAGECOUNT = 0
 
 # Crawl responsibly by identifying yourself (and your website) on the user-agent
 #USER_AGENT = 'crawlers (+http://www.yourdomain.com)'
@@ -64,9 +68,6 @@ DOWNLOAD_DELAY = 3
 
 # Configure item pipelines
 # See https://docs.scrapy.org/en/latest/topics/item-pipeline.html
-#ITEM_PIPELINES = {
-#    'crawlers.pipelines.CrawlersPipeline': 300,
-#}
 
 # Enable and configure the AutoThrottle extension (disabled by default)
 # See https://docs.scrapy.org/en/latest/topics/autothrottle.html
