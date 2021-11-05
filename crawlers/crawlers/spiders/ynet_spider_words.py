@@ -1,3 +1,4 @@
+from os import name
 from scrapy.http import FormRequest
 from sortedcontainers import SortedDict
 from scrapy.spiders import CrawlSpider
@@ -5,8 +6,8 @@ from scrapy.spiders import CrawlSpider
 import dateutil.parser
 import requests
 import re
-from crawlers.items import ArticleItem
 from crawlers.pipelines import MultiCSVItemPipeline
+from crawlers.items import ArticleItem
 
 multi_words_phrases_path = "../multi-words-phrases.txt"
 
@@ -46,8 +47,9 @@ class YnetSpiderSpider(CrawlSpider):
 
     def start_requests(self):
         # return [FormRequest('https://www.ynet.co.il/dating/pride/article/BysRdg0000P', callback=self.parse_article)]
-        for url in open('urls1.csv', 'r'):
+        for url in open('urls.csv', 'r'):
             url = url.strip()
+            # url = 'https://www.ynet.co.il/news/article/BJyc6EkTO'
 
             if re.search(NEW_FORMAT, url):
                 yield FormRequest(url, callback=self.parse_new_format_article)
@@ -86,9 +88,13 @@ class YnetSpiderSpider(CrawlSpider):
             '//h2[@class="subTitle"]//text()').get()
         content = ' '.join(response.xpath(
             '//div[@id="ArticleBodyComponent"]//div[contains(@class, "text_editor_paragraph")]//text()').extract())
-        comments = ' '.join(self.get_new_format_comments(response.url))
+        
 
-        self._set_dicts(item, title, subtitle, content, comments)
+        comments = self.get_new_format_comments(response.url)
+        joined_comments = ' '.join(comments)
+        item['comments_count'] = str(len(comments))
+
+        self._set_dicts(item, title, subtitle, content, joined_comments)
 
         yield item
 
@@ -113,10 +119,13 @@ class YnetSpiderSpider(CrawlSpider):
         subtitle = response.xpath(
             '//h2[@class="art_header_sub_title"]//text()').get()
         content = ' '.join(response.xpath(
-            '//div[@class="art_body art_body_width_3"]//p/text()').extract())
-        comments = ' '.join(self.get_old_format_comments(response.url))
+            '//div[@class="art_body art_body_width_3"]//p/text() | //div[@class="art_body art_body_width_3"]//span/text()').extract())
+        
+        comments = self.get_old_format_comments(response.url)
+        joined_comments = ' '.join(comments)
+        item['comments_count'] = str(len(comments))
 
-        self._set_dicts(item, title, subtitle, content, comments)
+        self._set_dicts(item, title, subtitle, content, joined_comments)
 
         yield item
 
@@ -209,3 +218,18 @@ class YnetSpiderSpider(CrawlSpider):
                         for x in comments_json['rows']]
 
         return comments
+
+
+if __name__ == '__main__':
+    print('phrases')
+    text = 'וכך נותר לנו הספר כמקור עיוני מרכזי, מלבד נאומיו וראיונותיו בתקשורת, לגבי התנהלותו בעתיד. בעיקר, כאשר דרך הטיפול שלו בקורונה יכולה לתת בסיס השוואתי להתנהלות של קודמו נתניהו. אולי הדבר גם יאפשר לבנט להשתחרר מן הצל הענק שמטיל עליו ראש הממשלה הקודם.'
+    print('ראש הממשלה' in phrases)
+    counter_dict = SortedDict()
+
+    for phrase in phrases:
+        count_phrase = text.count(phrase)
+
+        if count_phrase > 0:
+            counter_dict[phrase] = count_phrase
+
+    print(counter_dict)

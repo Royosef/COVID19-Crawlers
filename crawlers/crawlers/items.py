@@ -13,6 +13,7 @@ class ArticleItem(scrapy.Item):
     year = scrapy.Field()
     month = scrapy.Field()
     day = scrapy.Field()
+    comments_count = scrapy.Field()
 
     title_words_count = scrapy.Field()
     title_words_dict = scrapy.Field()
