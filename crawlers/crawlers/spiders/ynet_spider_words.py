@@ -9,6 +9,8 @@ import re
 from crawlers.pipelines import MultiCSVItemPipeline
 from crawlers.items import ArticleItem
 
+URLS_PATH='urls.csv'
+
 multi_words_phrases_path = "../multi-words-phrases.txt"
 
 REMOVAL_STRINGS = [",", ":", "(", ")", ".", " \"", "\" ", " ,\"", "\", ",
@@ -22,7 +24,7 @@ OLD_FORMAT = r'https:\/\/www\.ynet\.co\.il\/articles\/0,7340,L-(?!3369891)([0-9]
 def get_multi_words_phrases():
     phrases = []
 
-    with open(multi_words_phrases_path, 'r') as f:
+    with open(multi_words_phrases_path, 'r', encoding='Windows-1255', errors='ignore') as f:
         for line in f.readlines():
             phrase = line[:-1]
 
@@ -36,9 +38,10 @@ def get_multi_words_phrases():
 
 
 phrases = get_multi_words_phrases()
+#print(f'phrases: {phrases}')
 
 
-class YnetSpiderSpider(CrawlSpider):
+class YnetSpider(CrawlSpider):
     source_name = 'ynet'
     name = 'ynet_spider_words'
     allowed_domains = ['www.ynet.co.il']
@@ -47,7 +50,7 @@ class YnetSpiderSpider(CrawlSpider):
 
     def start_requests(self):
         # return [FormRequest('https://www.ynet.co.il/dating/pride/article/BysRdg0000P', callback=self.parse_article)]
-        for url in open('urls.csv', 'r'):
+        for url in open(URLS_PATH, 'r'):
             url = url.strip()
             # url = 'https://www.ynet.co.il/news/article/BJyc6EkTO'
 

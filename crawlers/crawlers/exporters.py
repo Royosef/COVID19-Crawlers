@@ -2,8 +2,7 @@
 
 class ArticleItemExporter(CsvItemExporter):
     def export_item(self, item):
-        self.fields_to_export = ['id', 'url', 'source',
-                                 'author', 'year', 'month', 'day', 'comments_count']
+        self.fields_to_export = ['id', 'url', 'source', 'author', 'year', 'month', 'day', 'comments_count']
         row = list(self._build_row(self.fields_to_export))
         self.csv_writer.writerow(row)
 

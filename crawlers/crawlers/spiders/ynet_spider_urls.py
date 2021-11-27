@@ -7,7 +7,7 @@ from crawlers.items import UrlItem
 # if you change the yearse update parse_month link extractor regex accordingly  
 years = (2018, 2021)
 
-class YnetSpiderSpider(CrawlSpider):
+class YnetSpider(CrawlSpider):
     source_name = 'ynet'
     name = 'ynet_spider_urls'
     allowed_domains = ['www.ynet.co.il']
