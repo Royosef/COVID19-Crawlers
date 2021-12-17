@@ -75,10 +75,10 @@ class YnetSpider(CrawlSpider):
         item['url'] = response.url
         item['source'] = self.source_name
         item['author'] = response.xpath(
-            '//div[contains(@class, "authors")]//text()').get()
+            '//div[contains(@class, "authors")]//text()').get().strip()
 
         date_str = response.xpath(
-            '//span[contains(@class, "DateDisplay")]/@data-wcmdate').get()
+            '//span[contains(@class, "DateDisplay")]/@data-wcmdate').get().strip()
         date = dateutil.parser.isoparse(date_str)
 
         item['year'] = str(date.year)
@@ -86,15 +86,15 @@ class YnetSpider(CrawlSpider):
         item['day'] = str(date.day)
 
         title = response.xpath(
-            '//h1[contains(@class, "mainTitle")]/text()').get()
+            '//h1[contains(@class, "mainTitle")]/text()').get().strip()
         subtitle = response.xpath(
-            '//h2[@class="subTitle"]//text()').get()
+            '//h2[@class="subTitle"]//text()').get().strip()
         content = ' '.join(response.xpath(
-            '//div[@id="ArticleBodyComponent"]//div[contains(@class, "text_editor_paragraph")]//text()').extract())
+            '//div[@id="ArticleBodyComponent"]//div[contains(@class, "text_editor_paragraph")]//text()').extract()).strip()
         
 
         comments = self.get_new_format_comments(response.url)
-        joined_comments = ' '.join(comments)
+        joined_comments = ' '.join(comments).strip()
         item['comments_count'] = str(len(comments))
 
         self._set_dicts(item, title, subtitle, content, joined_comments)
@@ -109,23 +109,24 @@ class YnetSpider(CrawlSpider):
         item['source'] = self.source_name
 
         item['author'] = response.xpath(
-            '//span[contains(@class, "art_header_footer_author")]/span//text()').get()
+            '//span[contains(@class, "art_header_footer_author")]/span//text()').get().strip()
 
         date_str = response.xpath(
-            '//span[contains(@class, "art_header_footer_author")]/text()').get()
+            '//span[contains(@class, "art_header_footer_author")]/text()').get().strip()
         date = date_str.split()[-3].split('.')
         item['year'] = str(date[2])
         item['month'] = str(date[1])
         item['day'] = str(date[0])
 
-        title = response.xpath('//h1[@class="art_header_title"]/text()').get()
+        title = response.xpath(
+            '//h1[@class="art_header_title"]/text()').get().strip()
         subtitle = response.xpath(
-            '//h2[@class="art_header_sub_title"]//text()').get()
+            '//h2[@class="art_header_sub_title"]//text()').get().strip()
         content = ' '.join(response.xpath(
-            '//div[@class="art_body art_body_width_3"]//p/text() | //div[@class="art_body art_body_width_3"]//span/text()').extract())
+            '//div[@class="art_body art_body_width_3"]//p/text() | //div[@class="art_body art_body_width_3"]//span/text()').extract()).strip()
         
         comments = self.get_old_format_comments(response.url)
-        joined_comments = ' '.join(comments)
+        joined_comments = ' '.join(comments).strip()
         item['comments_count'] = str(len(comments))
 
         self._set_dicts(item, title, subtitle, content, joined_comments)
