@@ -161,3 +161,7 @@ cython_debug/
 # End of https://www.toptal.com/developers/gitignore/api/visualstudiocode,python
 crawlers/urls.csv
 crawlers/crawls/*
+phrases_in_comments/kikar/*
+phrases_in_comments/ynet/*
+*.zip
+*output*

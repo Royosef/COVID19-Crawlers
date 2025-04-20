@@ -1,30 +1,39 @@
 from scrapy.linkextractors import LinkExtractor
 from scrapy.spiders import CrawlSpider, Rule
-# from scrapy.http import FormRequest
+import dateutil.parser
+from datetime import datetime
 
 from crawlers.items import UrlItem
 
-# if you change the yearse update parse_month link extractor regex accordingly
-years = (18, 21)
-
+start_date = datetime.strptime("10/2021", "%m/%Y")
+end_date = datetime.strptime("08/2022", "%m/%Y")
+# 1084 avg per month, 11 months, 12000
 
 class KikarSpider(CrawlSpider):
     source_name = 'kikar'
     name = 'kikar_spider_urls'
     allowed_domains = ['www.kikar.co.il']
-    start_urls = ['https://www.kikar.co.il/']
+    # start_urls = ['https://www.kikar.co.il/']
+    start_urls = ['https://www.kikar.co.il/499/427707']
 
     urls_counter = 0
 
     rules = (
         Rule(LinkExtractor(
-            allow=r'https:\/\/www\.kikar\.co\.il\/\d{6}\.html'), callback='parse_article', follow=True),
+            allow=r'https:\/\/www\.kikar\.co\.il$'), follow=True),
         Rule(LinkExtractor(
-            allow=r'https:\/\/www\.kikar\.co\.il\/(?!(\d{6}\.html)).*'), follow=True),
+            allow=r'https:\/\/www\.kikar\.co\.il\/([A-Za-z0-9-%]+)$'), follow=True),
+        Rule(LinkExtractor(
+            allow=r'https:\/\/www\.kikar\.co\.il\/(authors|magazines)\/[a-zA-Z0-9]{6,10}$'), follow=True),
+        Rule(LinkExtractor(
+            allow=r'https:\/\/www\.kikar\.co\.il\/(([A-Za-z0-9-]+)\/)+[a-zA-Z0-9]{6,10}$'), callback='parse_article', follow=True),
+        Rule(LinkExtractor(
+            allow=r'https:\/\/www\.kikar\.co\.il\/.*$'), follow=True),
     )
 
     custom_settings = {
         'CLOSESPIDER_PAGECOUNT': 0,
+        # 'CLOSESPIDER_ITEMCOUNT': 50,
     }
 
     def parse_article(self, response):
@@ -32,11 +41,12 @@ class KikarSpider(CrawlSpider):
         item['url'] = response.url
 
         try:
-            full_date_string = response.xpath(
-                '//div[@class="art-date-author"]/div[@class="article_buttons_field"][not(./a)]').get()
-            year = int(full_date_string.split()[5].strip().split('.')[2])
+            date_str = response.xpath('//meta[@name="article:published_time"]/@content').get().strip()
+            date = dateutil.parser.isoparse(date_str).replace(tzinfo=None)
+            
+            # print(f'date.year {(start_date <= date <= end_date)}')
 
-            if years[0] <= year <= years[1]: 
+            if start_date <= date <= end_date:
                 yield item
         except Exception as exc:
             print(exc)

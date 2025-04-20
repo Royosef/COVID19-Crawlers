@@ -9,12 +9,13 @@ import re
 from crawlers.pipelines import MultiCSVItemPipeline
 from crawlers.items import ArticleItem
 
-URLS_PATH='urls.csv'
+# URLS_PATH='urls-test.csv'
+URLS_PATH='ynet_urls_2024.csv'
 
-multi_words_phrases_path = "../multi-words-phrases.txt"
+multi_words_phrases_path = "../phrases.txt"
 
 REMOVAL_STRINGS = [",", ":", "(", ")", ".", " \"", "\" ", " ,\"", "\", ",
-                   " :\"", "\": ", "' ", " '", "?", "!", "<br />", "<br/>", "\n"]
+                   " :\"", "\": ", "' ", " '", "?", "!", "<br />", "<br/>", "\n", "\r"]
 QUOTATION = ["\"", "'"]
 
 NEW_FORMAT = r'https:\/\/www\.ynet\.co\.il\/(([A-Za-z]+)\/)+article\/[a-zA-Z0-9]{8,10}'
@@ -24,9 +25,10 @@ OLD_FORMAT = r'https:\/\/www\.ynet\.co\.il\/articles\/0,7340,L-(?!3369891)([0-9]
 def get_multi_words_phrases():
     phrases = []
 
-    with open(multi_words_phrases_path, 'r', encoding='Windows-1255', errors='ignore') as f:
+    # with open(multi_words_phrases_path, 'r', encoding='Windows-1255') as f:
+    with open(multi_words_phrases_path, 'rb') as f:
         for line in f.readlines():
-            phrase = line[:-1]
+            phrase = line[:-1].decode()
 
             for str1 in REMOVAL_STRINGS:
                 phrase = phrase.replace(str1, " ")
@@ -61,6 +63,7 @@ class YnetSpider(CrawlSpider):
                 yield FormRequest(url, callback=self.parse_old_format_article)
 
     custom_settings = {
+        'REDIRECT_ENABLED': False,
         'CLOSESPIDER_PAGECOUNT': 0,
         'ITEM_PIPELINES': {
             MultiCSVItemPipeline: 300,
@@ -74,23 +77,24 @@ class YnetSpider(CrawlSpider):
 
         item['url'] = response.url
         item['source'] = self.source_name
-        item['author'] = response.xpath(
-            '//div[contains(@class, "authors")]//text()').get().strip()
 
-        date_str = response.xpath(
-            '//span[contains(@class, "DateDisplay")]/@data-wcmdate').get().strip()
-        date = dateutil.parser.isoparse(date_str)
+        author_opt1 = response.xpath('//div[contains(@class, "authors")]//text()').get()
+        author_opt2 = response.xpath('//div[contains(@class, "author")]//text()').get()
+        item['author'] = (author_opt2 or author_opt1).strip()
+
+        date_str_opt1 = response.xpath('//time[contains(@class, "DateDisplay")]/@data-wcmdate').get()
+        date_str_opt2 = response.xpath('//meta[@property="article:published_time"]/@content').get()
+        date_str_opt3 = response.xpath('//meta[@property="og:published_time"]/@content').get()
+        date_str = date_str_opt1 or date_str_opt2 or date_str_opt3
+        date = dateutil.parser.isoparse(date_str.strip())
 
         item['year'] = str(date.year)
         item['month'] = str(date.month)
         item['day'] = str(date.day)
 
-        title = response.xpath(
-            '//h1[contains(@class, "mainTitle")]/text()').get().strip()
-        subtitle = response.xpath(
-            '//h2[@class="subTitle"]//text()').get().strip()
-        content = ' '.join(response.xpath(
-            '//div[@id="ArticleBodyComponent"]//div[contains(@class, "text_editor_paragraph")]//text()').extract()).strip()
+        title = (response.xpath('//h1[contains(@class, "mainTitle")]/text()').get() or response.xpath('//meta[@property="og:title"]/@content').get()).strip()
+        subtitle = (response.xpath('//h2[@class="subTitle"]//text()').get() or response.xpath('//meta[@property="og:description"]/@content').get()).strip()
+        content = ' '.join(response.xpath('//div[@id="ArticleBodyComponent"]//div[contains(@class, "text_editor_paragraph")]//text()').extract()).strip()
         
 
         comments = self.get_new_format_comments(response.url)
@@ -111,12 +115,14 @@ class YnetSpider(CrawlSpider):
         item['author'] = response.xpath(
             '//span[contains(@class, "art_header_footer_author")]/span//text()').get().strip()
 
-        date_str = response.xpath(
-            '//span[contains(@class, "art_header_footer_author")]/text()').get().strip()
-        date = date_str.split()[-3].split('.')
-        item['year'] = str(date[2])
-        item['month'] = str(date[1])
-        item['day'] = str(date[0])
+        date_str_opt1 = response.xpath('//time[contains(@class, "DateDisplay")]/@data-wcmdate').get()
+        date_str_opt2 = response.xpath('//meta[@property="article:published_time"]/@content').get()
+        date_str_opt3 = response.xpath('//meta[@property="og:published_time"]/@content').get()
+        date_str = date_str_opt1 if date_str_opt1 is not None else date_str_opt2 if date_str_opt2 is not None else date_str_opt3
+        date = dateutil.parser.isoparse(date_str).replace(tzinfo=None)
+        item['year'] = str(date.year)
+        item['month'] = str(date.month)
+        item['day'] = str(date.day)
 
         title = response.xpath(
             '//h1[@class="art_header_title"]/text()').get().strip()
@@ -225,15 +231,32 @@ class YnetSpider(CrawlSpider):
 
 
 if __name__ == '__main__':
-    print('phrases')
-    text = 'וכך נותר לנו הספר כמקור עיוני מרכזי, מלבד נאומיו וראיונותיו בתקשורת, לגבי התנהלותו בעתיד. בעיקר, כאשר דרך הטיפול שלו בקורונה יכולה לתת בסיס השוואתי להתנהלות של קודמו נתניהו. אולי הדבר גם יאפשר לבנט להשתחרר מן הצל הענק שמטיל עליו ראש הממשלה הקודם.'
-    print('ראש הממשלה' in phrases)
-    counter_dict = SortedDict()
+    # print('phrases')
+    # text = 'וכך נותר לנו הספר כמקור עיוני מרכזי, מלבד נאומיו וראיונותיו בתקשורת, לגבי התנהלותו בעתיד. בעיקר, כאשר דרך הטיפול שלו בקורונה יכולה לתת בסיס השוואתי להתנהלות של קודמו נתניהו. אולי הדבר גם יאפשר לבנט להשתחרר מן הצל הענק שמטיל עליו ראש הממשלה הקודם.'
+    # print('ראש הממשלה' in phrases)
+    # counter_dict = SortedDict()
 
-    for phrase in phrases:
-        count_phrase = text.count(phrase)
+    # for phrase in phrases:
+    #     count_phrase = text.count(phrase)
 
-        if count_phrase > 0:
-            counter_dict[phrase] = count_phrase
+    #     if count_phrase > 0:
+    #         counter_dict[phrase] = count_phrase
 
-    print(counter_dict)
+    # print(counter_dict)
+
+    import json
+    translated_words_path = "translated_words.json"
+    multi_words_phrases_path = "multi-words-phrases.txt"
+
+    translated = []
+
+    with open(translated_words_path, 'r', encoding='utf-8') as file:
+        translated_words = json.load(file)
+
+        translated = set(x for jur in translated_words.values() for ty in jur.values() for word_data in ty for x in word_data['Hebrew'])
+
+    p = set(get_multi_words_phrases())
+
+    with open('phrases.txt', 'w', encoding='utf8') as file:
+        for word in p | translated:
+            file.write(word + '\n')

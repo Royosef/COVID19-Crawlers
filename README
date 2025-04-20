@@ -1,0 +1,3 @@
+Run crawler:
+scrapy crawl ynet_spider_urls -s JOBDIR=crawls/ynet_spider_urls_2024_4 -o ynet_urls.csv
+scrapy crawl ynet_spider_urls -s JOBDIR=crawls/kikar_spider_urls_2024_9 -o kikar_urls.csv

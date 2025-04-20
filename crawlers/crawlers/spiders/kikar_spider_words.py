@@ -1,14 +1,19 @@
-from os import name
-from scrapy.http import FormRequest
+import json
+from scrapy.http import Request
 from sortedcontainers import SortedDict
 from scrapy.spiders import XMLFeedSpider
 from datetime import datetime
+from w3lib.html import remove_tags
 
 from lxml import html
 from crawlers.pipelines import MultiCSVItemPipeline
 from crawlers.items import ArticleItem
 
-multi_words_phrases_path = "../multi-words-phrases.txt"
+
+URLS_PATH='urls-test.csv'
+URLS_PATH='kikar_urls_2024.csv'
+
+multi_words_phrases_path = "../phrases.txt"
 
 REMOVAL_STRINGS = [",", ":", "(", ")", ".", " \"", "\" ", " ,\"", "\", ",
                    " :\"", "\": ", "' ", " '", "?", "!", "<br />", "<br/>", "\n"]
@@ -18,9 +23,9 @@ QUOTATION = ["\"", "'"]
 def get_multi_words_phrases():
     phrases = []
 
-    with open(multi_words_phrases_path, 'r') as f:
+    with open(multi_words_phrases_path, 'rb') as f:
         for line in f.readlines():
-            phrase = line[:-1]
+            phrase = line[:-1].decode()
 
             for str1 in REMOVAL_STRINGS:
                 phrase = phrase.replace(str1, " ")
@@ -37,58 +42,79 @@ phrases = get_multi_words_phrases()
 class KikarSpider(XMLFeedSpider):
     source_name = 'kikar'
     name = 'kikar_spider_words'
-    allowed_domains = ['www.kikar.co.il']
+    allowed_domains = ['www.kikar.co.il', 'a.kikar.co.il']
     itertag = 'Result'
 
     urls_counter = 0
 
     def start_requests(self):
         # return [FormRequest('https://www.kikar.co.il/wapapi.php?op=GetItem&app=1&dsk=1&id=387973')]
-        for article_url in open('urls-test.csv', 'r'):
+        for article_url in open(URLS_PATH, 'r'):
             article_url = article_url.strip()
             id = article_url.split('/')[-1].split('.')[0]
-            url = f'https://www.kikar.co.il/wapapi.php?op=GetItem&app=1&dsk=1&id={id}'
+            url = f'https://a.kikar.co.il/v2/articles/{id}'
 
-            yield FormRequest(url)
+            yield Request(url=url, callback=self.parse_article, meta={'ur': article_url})
 
     custom_settings = {
-        'CLOSESPIDER_PAGECOUNT': 1,
+        'CLOSESPIDER_PAGECOUNT': 0,
         'ITEM_PIPELINES': {
             MultiCSVItemPipeline: 300,
         }
     }
 
-    def parse_node(self, response, selector):
+
+    def parse_article(self, response):
+        data = json.loads(response.text)
+        new_id = data['id']
+        author = data['author']['name']
+        title = data['title']
+        subtitle = data['subTitle']
+
+        # Convert Unix timestamp (in milliseconds) to datetime
+        timestamp_ms = data['time']  # 'time' field in milliseconds
+        date_time = datetime.fromtimestamp(timestamp_ms / 1000.0)
+        year, month, day = date_time.year, date_time.month, date_time.day
+        
+        # Extract and clean HTML content parts
+        content_parts = [remove_tags(part['html']) for part in data['content']['content'] if part['type'] == 'html']
+        content = ' '.join(content_parts)
+        
+        comments_url = f'https://a.kikar.co.il/v2/articles/{new_id}/comments'
+        
+        # Pass data to the next method via the meta dictionary
+        yield Request(url=comments_url, callback=self.parse_comments, meta={
+            'article_id': new_id,
+            'author': author,
+            'title': title,
+            'subtitle': subtitle,
+            'year': year,
+            'month': month,
+            'day': day,
+            'content': content,
+            'ur': response.meta['ur']
+        })
+
+    def parse_comments(self, response):
         item = ArticleItem()
         self.urls_counter += 1
         item['id'] = str(self.urls_counter)
 
-        kikar_article_id = response.url.split('=')[-1]
-        item['url'] = f'https://www.kikar.co.il/{kikar_article_id}.html'
+        item['url'] = response.meta['ur']
         item['source'] = self.source_name
+        item['author'] = response.meta['author']
+        item['year'] = str(response.meta['year'])
+        item['month'] = str(response.meta['month'])
+        item['day'] = str(response.meta['day'])
 
-        item['author'] = selector.xpath(
-            './Item/Author/text()').get().replace('\n', ' ')
-
-        timestamp = selector.xpath(
-            './Item/ItemDateRaw/text()').get().replace('\n', ' ')
-        date = datetime.fromtimestamp(int(timestamp))
-
-        item['year'] = str(date.year)
-        item['month'] = str(date.month)
-        item['day'] = str(date.day)
-
-        title = selector.xpath('./Item/Title/text()').get()
-        subtitle = selector.xpath('./Item/SubTitle/text()').get()
-
-        content_html = selector.xpath('./Item/ItemText/text()').get()
-        content = ' '.join(html.fromstring(
-            content_html).xpath('//text()'))
-
-        comments = self.get_comments(selector)
+        title = response.meta['title']
+        subtitle = response.meta['subtitle']
+        content = response.meta['content']
+        
+        comments = self.get_comments(response)
         joined_comments = ' '.join(comments).strip()
-        item['comments_count'] = selector.xpath(
-            './Item/CommentCount/text()').get()
+
+        item['comments_count'] = len(comments)
 
         self._set_dicts(item, title, subtitle, content, joined_comments)
 
@@ -160,17 +186,12 @@ class KikarSpider(XMLFeedSpider):
 
         return counter_dict
 
-    def get_comments(self, item):
-        xml_comments = item.xpath('./Item/ItemComments/Comment')
-        comments = []
-
-        for comment in xml_comments:
-            title = comment.xpath('Title/text()').get() or ''
-            text = comment.xpath('Text/text()').get() or ''
-
-            comments.append(f'{title} {text}')
+    def get_comments(self, response):
+        comments_data = json.loads(response.text)
+        comments = [comment['content'] for comment in comments_data]
 
         return comments
+
 
 
 if __name__ == '__main__':
